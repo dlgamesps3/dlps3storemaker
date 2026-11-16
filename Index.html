@@ -1,1 +1,397 @@
 
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DL PS3 STORE MAKER</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#080e1b;color:#fff;font-family:Arial}
+header{padding:20px;background:#101e35;border-bottom:2px solid #168cff}
+header h2{margin:0;color:#36baff}
+header small{color:#9eb8d5}
+main{max-width:950px;margin:25px auto;padding:15px}
+.card{background:#111e32;border:1px solid #29415f;border-radius:13px;padding:18px;margin-bottom:18px}
+h3{margin-top:0;color:#43bfff}
+label{display:block;font-size:12px;color:#a9c5e5;margin:12px 0 5px}
+input,select{width:100%;padding:12px;background:#071426;color:white;border:1px solid #345477;border-radius:8px}
+button{padding:12px 16px;border:0;border-radius:8px;background:#087fe5;color:white;font-weight:bold;cursor:pointer;margin-top:12px}
+button:hover{background:#20aaff}
+.secondary{background:#263d5c}
+.delete{background:#a52b43;margin:0}
+.game{display:flex;align-items:center;gap:12px;padding:10px;background:#091426;border-radius:9px;margin-top:10px}
+.game img{width:48px;height:58px;object-fit:cover;border-radius:5px;background:#263d5c}
+.game div{flex:1;min-width:0}
+.game small{color:#9eb8d5}
+.tree{white-space:pre-wrap;background:#071426;padding:14px;border-radius:8px;color:#8bd5ff;font:13px monospace;overflow:auto}
+.preview{background:linear-gradient(120deg,#06142b,#07559a,#07152d);padding:20px;border-radius:10px}
+.tiles{display:flex;gap:8px;flex-wrap:wrap}
+.tile{background:#164a78;padding:12px;border-radius:7px;font-size:12px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:550px){.row{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+<h2>🎮 DL PS3 STORE MAKER</h2>
+<small>CRIADOR DE LOJAS XML PARA PLAYSTATION 3</small>
+</header>
+
+<main>
+<section class="card">
+<h3>01 — Dados da loja</h3>
+<label>Nome da loja</label>
+<input id="nome" value="DL GAMES">
+<label>Nome da pasta / ID</label>
+<input id="pasta" value="DLGAMES27">
+<label>Descrição</label>
+<input id="descricao" value="Sua loja gamer! Os melhores conteúdos para PS3.">
+</section>
+
+<section class="card">
+<h3>02 — Adicionar jogo</h3>
+<label>Nome do jogo</label>
+<input id="jogo" placeholder="Nome do jogo">
+<div class="row">
+<div>
+<label>Categoria</label>
+<select id="categoria">
+<option>JOGOS PS3</option>
+<option>JOGOS PS2</option>
+<option>DLC</option>
+<option>HOMEBREWS</option>
+<option>APLICATIVOS</option>
+<option>OUTROS</option>
+</select>
+</div>
+<div>
+<label>Descrição / ID</label>
+<input id="info" placeholder="BLUS12345">
+</div>
+</div>
+<label>Link do arquivo</label>
+<input id="link" placeholder="https://...">
+<label>Capa do jogo</label>
+<input id="capa" type="file" accept="image/*">
+<button onclick="adicionar()">＋ ADICIONAR JOGO</button>
+</section>
+
+<section class="card">
+<h3>03 — Jogos cadastrados</h3>
+<div id="lista">Nenhum jogo cadastrado.</div>
+</section>
+
+<section class="card">
+<h3>04 — Estrutura da loja</h3>
+<div class="tree" id="estrutura"></div>
+</section>
+
+<section class="card">
+<h3>05 — Prévia da loja</h3>
+<div class="preview">
+<small>XMB PLAYSTATION 3</small>
+<h2 id="prevNome">DL GAMES</h2>
+<div class="tiles" id="prevCategorias"></div>
+</div>
+</section>
+
+<section class="card">
+<h3>06 — Exportar loja</h3>
+<p style="color:#9eb8d5;font-size:13px">
+Gera a pasta da loja, XML principal, XML dos submenus e imagens das capas.
+</p>
+<button onclick="exportar()">⬇ GERAR LOJA COMPLETA ZIP</button>
+<button class="secondary" onclick="baixarPrincipal()">BAIXAR XML PRINCIPAL</button>
+</section>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+let jogos=[];
+
+const $=id=>document.getElementById(id);
+
+const categorias=[
+"JOGOS PS3","JOGOS PS2","DLC",
+"HOMEBREWS","APLICATIVOS","OUTROS"
+];
+
+function idPasta(){
+return ($("pasta").value||"DLGAMES")
+.toUpperCase().replace(/[^A-Z0-9_]/g,"_");
+}
+
+function esc(s){
+return String(s??"").replace(/&/g,"&amp;")
+.replace(/</g,"&lt;").replace(/>/g,"&gt;")
+.replace(/"/g,"&quot;").replace(/'/g,"&apos;");
+}
+
+function slug(s){
+return s.normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+.replace(/[^A-Za-z0-9]/g,"_").toUpperCase();
+}
+
+function adicionar(){
+let nome=$("jogo").value.trim();
+let link=$("link").value.trim();
+
+if(!nome||!link){
+alert("Informe o nome e o link do jogo!");
+return;
+}
+
+let arquivo=$("capa").files[0];
+
+jogos.push({
+nome,
+link,
+categoria:$("categoria").value,
+info:$("info").value,
+arquivo,
+caminho:arquivo?
+"IMG/JOGOS/"+String(jogos.length+1).padStart(3,"0")+"_"+slug(nome)+"."+arquivo.name.split(".").pop().toLowerCase()
+:null
+});
+
+$("jogo").value="";
+$("link").value="";
+$("info").value="";
+$("capa").value="";
+
+atualizar();
+}
+
+function atualizar(){
+$("prevNome").textContent=$("nome").value;
+
+$("lista").innerHTML="";
+
+if(!jogos.length){
+$("lista").textContent="Nenhum jogo cadastrado.";
+}
+
+jogos.forEach((g,i)=>{
+let div=document.createElement("div");
+div.className="game";
+
+let img=document.createElement("img");
+if(g.arquivo)img.src=URL.createObjectURL(g.arquivo);
+
+let texto=document.createElement("div");
+let nome=document.createElement("strong");
+nome.textContent=g.nome;
+
+let info=document.createElement("br");
+let small=document.createElement("small");
+small.textContent=g.categoria+" · "+g.info;
+
+texto.append(nome,info,small);
+
+let btn=document.createElement("button");
+btn.className="delete";
+btn.textContent="EXCLUIR";
+btn.onclick=()=>{
+jogos.splice(i,1);
+atualizar();
+};
+
+div.append(img,texto,btn);
+$("lista").append(div);
+});
+
+let usadas=categorias.filter(c=>jogos.some(g=>g.categoria===c));
+
+$("prevCategorias").innerHTML="";
+(usadas.length?usadas:categorias.slice(0,4)).forEach(c=>{
+let d=document.createElement("div");
+d.className="tile";
+d.textContent=c;
+$("prevCategorias").append(d);
+});
+
+$("estrutura").textContent=
+idPasta()+"/\n"+
+"└── USRDIR/\n"+
+"    ├── XML/\n"+
+"    │   └── PRINCIPAL.xml\n"+
+usadas.map(c=>"    │   ├── "+slug(c)+".xml\n").join("")+
+"    ├── IMG/\n"+
+"    │   ├── MENU/\n"+
+"    │   └── JOGOS/\n"+
+"    └── DOWNLOADS/";
+}
+
+function gerarCategoria(cat){
+let lista=jogos.filter(g=>g.categoria===cat);
+let id=idPasta();
+let tabelas="",itens="";
+
+lista.forEach((g,i)=>{
+let k=String(i+1);
+let icon=g.caminho?
+"/dev_hdd0/game/"+id+"/USRDIR/"+g.caminho:
+"/dev_hdd0/game/"+id+"/USRDIR/IMG/JOGOS/DEFAULT.PNG";
+
+tabelas+=`
+<Table key="${k}">
+<Pair key="icon"><String>${esc(icon)}</String></Pair>
+<Pair key="title"><String>${esc(g.nome)}</String></Pair>
+<Pair key="info"><String>${esc(g.info||cat)}</String></Pair>
+<Pair key="ingame"><String>disable</String></Pair>
+<Pair key="module_name"><String>webrender_plugin</String></Pair>
+<Pair key="module_action"><String>${esc(g.link)}</String></Pair>
+</Table>
+`;
+
+itens+=`
+<Item class="type:x-xmb/module-action" key="${k}" attr="${k}"/>
+`;
+});
+
+return `<?xml version="1.0" encoding="UTF-8"?>
+<XMBML version="1.0">
+<View id="${slug(cat)}_items">
+<Attributes>
+${tabelas}
+</Attributes>
+<Items>
+${itens}
+</Items>
+</View>
+</XMBML>`;
+}
+
+function gerarPrincipal(){
+let id=idPasta();
+let usadas=categorias.filter(c=>jogos.some(g=>g.categoria===c));
+let tabelas="",itens="";
+
+usadas.forEach(c=>{
+let k=slug(c);
+tabelas+=`
+<Table key="${k}">
+<Pair key="icon"><String>/dev_hdd0/game/${id}/USRDIR/IMG/MENU/${k}.PNG</String></Pair>
+<Pair key="title"><String>${esc(c)}</String></Pair>
+<Pair key="info"><String>${jogos.filter(g=>g.categoria===c).length} conteúdos</String></Pair>
+<Pair key="ingame"><String>disable</String></Pair>
+</Table>`;
+
+itens+=`
+<Query class="type:x-xmb/folder-pixmap"
+key="${k}" attr="${k}"
+src="xmb://localhost/dev_hdd0/game/${id}/USRDIR/XML/${k}.xml#${k}_items"/>`;
+});
+
+return `<?xml version="1.0" encoding="UTF-8"?>
+<XMBML version="1.0">
+<View id="${id}_xmb_main">
+<Attributes>
+<Table key="${id}_main">
+<Pair key="icon"><String>/dev_hdd0/game/${id}/ICON0.png</String></Pair>
+<Pair key="icon_notation"><String>WNT_XmbItemAlbum</String></Pair>
+<Pair key="pic"><String>/dev_hdd0/game/${id}/PIC1.PNG</String></Pair>
+<Pair key="title"><String>${esc($("nome").value)}</String></Pair>
+<Pair key="info"><String>${esc($("descricao").value)}</String></Pair>
+<Pair key="ingame"><String>disable</String></Pair>
+</Table>
+${tabelas}
+</Attributes>
+<Items>
+<Query class="type:x-xmb/folder-pixmap"
+key="${id}_main" attr="${id}_main"
+src="#${id}_main_items"/>
+</Items>
+</View>
+<View id="${id}_main_items">
+<Attributes>
+${tabelas}
+</Attributes>
+<Items>
+${itens}
+</Items>
+</View>
+</XMBML>`;
+}
+
+function baixarPrincipal(){
+baixar("PRINCIPAL.xml",gerarPrincipal());
+}
+
+function baixar(nome,conteudo){
+let blob=new Blob([conteudo],{type:"application/xml;charset=utf-8"});
+let a=document.createElement("a");
+a.href=URL.createObjectURL(blob);
+a.download=nome;
+a.click();
+setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+
+async function exportar(){
+if(!jogos.length){
+alert("Adicione pelo menos um jogo primeiro.");
+return;
+}
+
+if(typeof JSZip==="undefined"){
+alert("Não foi possível carregar o JSZip. Confira sua conexão.");
+return;
+}
+
+let zip=new JSZip();
+let id=idPasta();
+let raiz=zip.folder(id);
+let usr=raiz.folder("USRDIR");
+let xml=usr.folder("XML");
+let imagens=usr.folder("IMG");
+
+xml.file("PRINCIPAL.xml",gerarPrincipal());
+
+categorias.forEach(c=>{
+if(jogos.some(g=>g.categoria===c)){
+xml.file(slug(c)+".xml",gerarCategoria(c));
+}
+});
+
+imagens.folder("MENU");
+let capas=imagens.folder("JOGOS");
+
+for(let g of jogos){
+if(g.arquivo&&g.caminho){
+capas.file(g.caminho.split("/").pop(),g.arquivo);
+}
+}
+
+if(!jogos.some(g=>g.arquivo)){
+capas.file("LEIA-ME.txt","Nenhuma capa foi enviada.");
+}
+
+usr.folder("DOWNLOADS").file("LEIA-ME.txt",
+"Pasta de arquivos adicionais da loja.");
+
+raiz.file("LEIA-ME.txt",
+"Loja: "+$("nome").value+"\n"+
+"Pasta: "+id+"\n"+
+"Gerada pelo DL PS3 STORE MAKER.");
+
+try{
+let blob=await zip.generateAsync({type:"blob"});
+let a=document.createElement("a");
+a.href=URL.createObjectURL(blob);
+a.download=id+"_LOJA_PS3.zip";
+a.click();
+setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+alert("ZIP gerado com sucesso!");
+}catch(e){
+alert("Erro ao gerar ZIP: "+e.message);
+}
+}
+
+$("nome").addEventListener("input",atualizar);
+$("pasta").addEventListener("input",atualizar);
+atualizar();
+</script>
+</body>
+</html>
+
